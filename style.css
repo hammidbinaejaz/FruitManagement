@@ -1157,3 +1157,150 @@ body.dark .chart-container {
     height: 56px;
   }
 }
+
+/* ============================================
+   📱 MOBILE RESPONSIVE + MODERN UI ENHANCEMENTS
+   ============================================ */
+
+/* 1️⃣ Base Readability & Touch Size */
+body {
+  font-size: 16px;
+  line-height: 1.5;
+  color: #2E4632;
+  scroll-behavior: smooth;
+}
+
+input, select, button {
+  font-size: 1rem;
+  min-height: 44px; /* finger-friendly */
+}
+
+/* 2️⃣ Sticky Header */
+header {
+  position: sticky;
+  top: 0;
+  z-index: 999;
+  background: linear-gradient(135deg, #4CAF50 0%, #81C784 100%);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+/* 3️⃣ Smooth Motion & Hover Effects */
+* {
+  transition: all 0.25s ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  opacity: 0.95;
+}
+
+.kpi-card:hover,
+.settings-card:hover,
+.summary-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 18px rgba(0,0,0,0.12);
+}
+
+/* 4️⃣ Scrollable Tables for Mobile */
+table {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  white-space: nowrap;
+  border-radius: 8px;
+}
+
+/* 5️⃣ Responsive Grid & Form Adjustments */
+@media (max-width: 768px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  nav {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.4rem;
+  }
+
+  nav button {
+    flex: 1 1 45%;
+    font-size: 0.9rem;
+  }
+
+  form {
+    flex-direction: column;
+    gap: 0.8rem;
+  }
+
+  main {
+    padding: 0.8rem;
+  }
+
+  .kpi-card, .settings-card, .account-card, .summary-card {
+    border-radius: 14px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  }
+
+  footer {
+    font-size: 0.85rem;
+    text-align: center;
+    padding: 0.8rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  nav button {
+    flex: 1 1 100%;
+  }
+}
+
+/* 6️⃣ Light Glow Gradients & Shadows */
+.kpi-card,
+.settings-card,
+.summary-card,
+form {
+  background: linear-gradient(135deg, #FFFFFF 0%, #F9FBF9 100%);
+  border: 1px solid #DCE5DC;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.04);
+}
+
+/* 7️⃣ Footer Simplify */
+footer {
+  background: linear-gradient(135deg, #4CAF50 0%, #81C784 100%);
+  color: white;
+  text-align: center;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+}
+
+/* 8️⃣ Optional Subtle Glow for Buttons */
+button {
+  background: linear-gradient(90deg, #4CAF50, #81C784);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.25);
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+/* 9️⃣ Form Inputs Enhanced */
+input, select {
+  border: 1px solid #CDE8CD;
+  border-radius: 6px;
+  background-color: #fff;
+  padding: 0.5rem 0.7rem;
+}
+
+input:focus, select:focus {
+  border-color: #4CAF50;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+}
