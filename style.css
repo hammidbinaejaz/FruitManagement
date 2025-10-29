@@ -1102,50 +1102,6 @@ footer {
 }
 
 /* Dark Mode - Premium */
-body.dark {
-  /* Midnight Orchard (Dark) */
-  --bg-primary: #101C14;
-  --bg-secondary: #18291D;
-  --bg-gradient: linear-gradient(145deg, #0B1510 0%, #122418 100%);
-  --text-primary: #E6F6EC;
-  --text-secondary: #A7C3B4;
-  --text-muted: #7fa394;
-  --border-light: #1F3525;
-  --primary-green: #6EE7B7;
-  --primary-light: #6EE7B7;
-  --accent-gold: #FACC15;
-  background: var(--bg-gradient);
-  color: var(--text-primary);
-}
-
-body.dark header {
-  background: linear-gradient(135deg, #163a2a 0%, #205c41 100%);
-}
-
-body.dark .dashboard-section,
-body.dark .kpi-card,
-body.dark .account-card,
-body.dark .account-header,
-body.dark .transaction-form,
-body.dark .transactions-container,
-body.dark .khata-panel,
-body.dark .settings-card,
-body.dark .modal-content,
-body.dark .stock-card,
-body.dark .summary-card {
-  background: var(--bg-secondary);
-  border-color: var(--border-light);
-  box-shadow: 0 0 10px rgba(110,231,183,0.2);
-}
-
-body.dark .transactions-table th {
-  background: #122418;
-  color: var(--primary-green);
-}
-
-body.dark .transactions-table tr:hover {
-  background: #132a1e;
-}
 
 /* Charts Container */
 .chart-container {
