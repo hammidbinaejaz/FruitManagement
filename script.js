@@ -14,12 +14,115 @@ let varieties = JSON.parse(localStorage.getItem('varieties')) || [
 ];
 let prefs = JSON.parse(localStorage.getItem('prefs')) || { darkMode: false, profile: { name: '', mandi: '', phone: '', gst: '', address: '' } };
 let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
+function updateProfileDashboardCard() {
+  const pf = prefs.profile || {};
+  var name = document.getElementById('dashboardProfileName');
+  var mandi = document.getElementById('dashboardProfileMandi');
+  var phone = document.getElementById('dashboardProfilePhone');
+  if (name) name.textContent = pf.name || 'User/Firm Name';
+  if (mandi) mandi.textContent = pf.mandi || 'Mandi';
+  if (phone) phone.textContent = pf.phone || '';
+}
+window.addEventListener('DOMContentLoaded', updateProfileDashboardCard);
 
-// Current viewing state
+var profileForm = document.getElementById('profileForm');
+if (profileForm) {
+  profileForm.addEventListener('submit', function() {
+    setTimeout(updateProfileDashboardCard, 100);
+  });
+}
+window.addEventListener('DOMContentLoaded', function () {
+  var btn = document.getElementById('generateFullReportGrower');
+  if (!btn) return;
+  btn.addEventListener('click', function () {
+    if (!window.currentViewingGrower) return;
+    const grower = window.currentViewingGrower;
+    const allTxs = grower.transactions || [];
+    if (allTxs.length === 0) {
+      alert('No transactions for this grower.');
+      return;
+    }
+    const rows = allTxs.map(tx =>
+      `<tr>
+        <td>${tx.date}</td>
+        <td>${tx.variety}</td>
+        <td>${tx.boxes}</td>
+        <td>${tx.boxType || '-'}</td>
+        <td>${tx.rate || ''}</td>
+        <td>${tx.commission || 0}</td>
+        <td>${tx.transport || 0}</td>
+        <td>${tx.total}</td>
+        <td>${tx.paymentStatus}</td>
+      </tr>`
+    ).join('');
+    const html = `
+      <html><head>
+      <meta charset='utf-8'>
+      <title>${grower.name} - Full Report</title>
+      <style>
+        body{font-family:sans-serif;padding:2em;}
+        table{border-collapse:collapse;width:100%;}
+        th,td{border:1px solid #ccc;padding:6px 8px;}
+        th{background:#f0fdfa;}
+      </style>
+      </head>
+      <body>
+        <h2>Grower: ${grower.name}</h2>
+        <div>Contact: ${grower.contact || ''}</div>
+        <div>Date: ${(new Date()).toLocaleDateString()}</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th><th>Variety</th><th>Boxes</th><th>Box Type</th>
+              <th>Rate</th><th>Commission</th><th>Transport</th><th>Total</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </body></html>`;
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 550);
+  });
+});// Current viewing state
 let currentViewingGrower = null;
 let currentViewingCustomer = null;
 let editingGrowerTxId = null;
 let editingCustomerTxId = null;
+
+// ==================== DASHBOARD ENHANCED FILTERS ====================
+// Filters for variety and date (custom controls above charts)
+let analyticsVariety = 'all';
+let analyticsStart = null;
+let analyticsEnd = null;
+
+function setupDashboardFilters() {
+  const varietySelect = document.getElementById('analyticsVariety');
+  // Populate varieties
+  varietySelect.innerHTML = '<option value="all">All</option>' + varieties.map(v=>`<option value="${v.name}">${v.name}</option>`).join('');
+  varietySelect.value = analyticsVariety;
+  varietySelect.onchange = () => { analyticsVariety = varietySelect.value; };
+  // Set up apply/reset
+  document.getElementById('applyAnalyticsFilter').onclick = () => {
+    analyticsVariety = varietySelect.value;
+    analyticsStart = document.getElementById('analyticsCustomStart').value || null;
+    analyticsEnd   = document.getElementById('analyticsCustomEnd').value || null;
+    updateDashboard();
+  };
+  document.getElementById('resetAnalyticsFilter').onclick = () => {
+    analyticsVariety = 'all';
+    analyticsStart = analyticsEnd = null;
+    varietySelect.value = 'all';
+    document.getElementById('analyticsCustomStart').value = '';
+    document.getElementById('analyticsCustomEnd').value = '';
+    updateDashboard();
+  };
+  // Export dashboard hooks (stubs for now)
+  document.getElementById('exportDashboardPDF').onclick = exportDashboardPDF;
+  document.getElementById('exportDashboardXLSX').onclick = exportDashboardXLSX;
+}
 
 // ========== TAB SWITCHING ==========
 const tabs = {
@@ -64,7 +167,15 @@ function updateDashboard() {
   const today = formatDate(now);
   
   let dateFilter = (tx) => true;
-  if (dateRange === 'today') {
+  if (analyticsStart || analyticsEnd) {
+    dateFilter = (tx) => {
+      const tDate = tx.date;
+      let ok = true;
+      if (analyticsStart) ok = ok && tDate >= analyticsStart;
+      if (analyticsEnd) ok = ok && tDate <= analyticsEnd;
+      return ok;
+    };
+  } else if (dateRange === 'today') {
     dateFilter = (tx) => tx.date === today;
   } else if (dateRange === 'week') {
     const weekAgo = new Date(now);
@@ -75,7 +186,22 @@ function updateDashboard() {
     monthAgo.setMonth(now.getMonth() - 1);
     dateFilter = (tx) => new Date(tx.date) >= monthAgo;
   }
-
+  function updateProfileDashboardCard() {
+    const pf = prefs.profile || {};
+    var name = document.getElementById('dashboardProfileName');
+    var mandi = document.getElementById('dashboardProfileMandi');
+    var phone = document.getElementById('dashboardProfilePhone');
+    if (name) name.textContent = pf.name || 'User/Firm Name';
+    if (mandi) mandi.textContent = pf.mandi || 'Mandi';
+    if (phone) phone.textContent = pf.phone || '';
+  }
+  window.addEventListener('DOMContentLoaded', updateProfileDashboardCard);
+  var profileForm = document.getElementById('profileForm');
+  if (profileForm) {
+    profileForm.addEventListener('submit', function() {
+      setTimeout(updateProfileDashboardCard, 200);
+    });
+  }
   // Collect all transactions
   const allPurchases = growers.flatMap(g => g.transactions || []);
   const allSales = customers.flatMap(c => c.transactions || []);
@@ -154,7 +280,12 @@ function renderGrowersList() {
   const list = document.getElementById('growersList');
   list.innerHTML = '';
   const q = (document.getElementById('growerSearch')?.value || '').toLowerCase();
-  growers.filter(g => g.name.toLowerCase().includes(q)).forEach(grower => {
+  const matching = growers.filter(g => g.name.toLowerCase().includes(q));
+  if (matching.length===0) {
+    list.innerHTML='<div class="empty-state"><span class="empty-state-emoji">🌾</span>No growers yet. Click <b>+</b> to add one!</div>';
+    return;
+  }
+  matching.forEach(grower => {
     const stats = calculateGrowerStats(grower);
     const card = document.createElement('div');
     card.className = 'account-card';
@@ -250,6 +381,7 @@ function renderGrowerTransactions(grower) {
       <td>${tx.date}</td>
       <td>${tx.variety}</td>
       <td class="num">${tx.boxes}</td>
+      <td>${tx.boxType || '-'}</td>
       <td class="num">${formatCurrency(tx.rate)}</td>
       <td class="num">${formatCurrency(tx.commission || 0)}</td>
       <td class="num">${formatCurrency(tx.transport || 0)}</td>
@@ -295,6 +427,7 @@ document.getElementById('growerTransactionForm').addEventListener('submit', (e) 
     date: document.getElementById('growerTxDate').value,
     variety: document.getElementById('growerTxVariety').value,
     boxes: parseInt(document.getElementById('growerTxBoxes').value),
+    boxType: document.getElementById('growerTxBoxType').value,
     rate: parseFloat(document.getElementById('growerTxRate').value),
     commission: parseFloat(document.getElementById('growerTxCommission').value || 0),
     transport: parseFloat(document.getElementById('growerTxTransport').value || 0),
@@ -357,7 +490,12 @@ function renderCustomersList() {
   const list = document.getElementById('customersList');
   list.innerHTML = '';
   const q = (document.getElementById('customerSearch')?.value || '').toLowerCase();
-  customers.filter(c => c.name.toLowerCase().includes(q)).forEach(customer => {
+  const matching = customers.filter(c => c.name.toLowerCase().includes(q));
+  if (matching.length===0) {
+    list.innerHTML='<div class="empty-state"><span class="empty-state-emoji">👥</span>No customers yet. Click <b>+</b> to add one!</div>';
+    return;
+  }
+  matching.forEach(customer => {
     const stats = calculateCustomerStats(customer);
     const card = document.createElement('div');
     card.className = 'account-card';
@@ -453,11 +591,13 @@ function renderCustomerTransactions(customer) {
       <td>${tx.date}</td>
       <td>${tx.variety}</td>
       <td class="num">${tx.boxes}</td>
+      <td>${tx.boxType || '-'}</td>
       <td class="num">${formatCurrency(tx.rate)}</td>
       <td class="num">${formatCurrency(tx.commission || 0)}</td>
       <td class="num">${formatCurrency(tx.transport || 0)}</td>
       <td class="num">${formatCurrency(tx.total)}</td>
       <td><span class="status-badge ${tx.paymentStatus === 'received' ? 'status-paid' : 'status-pending'}">${tx.paymentStatus === 'received' ? 'Received' : 'Pending'}</span></td>
+      <td>${tx.notes || ''}</td>
       <td class="table-actions">
         <button class="btn-edit" onclick="editCustomerTransaction('${customer.id}', '${tx.id}')">Edit</button>
         <button class="btn-delete" onclick="deleteCustomerTransaction('${customer.id}', '${tx.id}')">Delete</button>
@@ -498,6 +638,7 @@ document.getElementById('customerTransactionForm').addEventListener('submit', (e
     date: document.getElementById('customerTxDate').value,
     variety: document.getElementById('customerTxVariety').value,
     boxes: parseInt(document.getElementById('customerTxBoxes').value),
+    boxType: document.getElementById('customerTxBoxType').value,
     rate: parseFloat(document.getElementById('customerTxRate').value),
     commission: parseFloat(document.getElementById('customerTxCommission').value || 0),
     transport: parseFloat(document.getElementById('customerTxTransport').value || 0),
@@ -525,22 +666,50 @@ document.getElementById('customerTransactionForm').addEventListener('submit', (e
 });
 
 window.editCustomerTransaction = (customerId, txId) => {
+  console.log("📝 Editing transaction:", customerId, txId);
+
   const customer = customers.find(c => c.id === customerId);
-  const tx = (customer.transactions || []).find(t => t.id === txId);
-  if (!tx) return;
+  if (!customer) {
+    alert("Customer not found. Try refreshing the page.");
+    return;
+  }
+
+  const tx = (customer.transactions || []).find(t => String(t.id) === String(txId));
+  if (!tx) {
+    alert("Transaction not found for this customer.");
+    console.warn("Transactions available:", customer.transactions);
+    return;
+  }
 
   currentViewingCustomer = customer;
-  editingCustomerTxId = txId;
-  document.getElementById('customerTxDate').value = tx.date;
-  document.getElementById('customerTxVariety').value = tx.variety;
-  document.getElementById('customerTxBoxes').value = tx.boxes;
-  document.getElementById('customerTxRate').value = tx.rate;
-  document.getElementById('customerTxCommission').value = tx.commission || 0;
-  document.getElementById('customerTxTransport').value = tx.transport || 0;
-  document.getElementById('customerTxPaymentStatus').value = tx.paymentStatus;
-  document.getElementById('customerTxNotes').value = tx.notes || '';
-  document.getElementById('customerTransactionForm').classList.remove('hidden');
-};
+  editingCustomerTxId = tx.id;
+
+  // Fill form safely
+  const form = document.getElementById("customerTransactionForm");
+  form.classList.remove("hidden");
+
+  document.getElementById("customerTxDate").value = tx.date || formatDate(new Date());
+  document.getElementById("customerTxVariety").value = tx.variety || "";
+  document.getElementById("customerTxBoxes").value = tx.boxes || 0;
+  document.getElementById("customerTxBoxType").value = tx.boxType || "";
+  document.getElementById("customerTxRate").value = tx.rate || 0;
+  document.getElementById("customerTxCommission").value = tx.commission || 0;
+  document.getElementById("customerTxTransport").value = tx.transport || 0;
+  document.getElementById("customerTxPaymentStatus").value = tx.paymentStatus || "pending";
+  document.getElementById("customerTxNotes").value = tx.notes || "";
+
+  // Scroll form into view
+  form.scrollIntoView({ behavior: "smooth", block: "center" });
+
+  showToast("Loaded transaction for editing", "info");
+};function showToast(msg, type = "success") {
+  const toast = document.createElement("div");
+  toast.textContent = msg;
+  toast.className = "toast show " + type;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.classList.remove("show"), 3000);
+  setTimeout(() => toast.remove(), 3500);
+}
 
 window.deleteCustomerTransaction = (customerId, txId) => {
   if (!confirm('Delete this transaction?')) return;
@@ -810,7 +979,12 @@ function renderKhata() {
   const q = (document.getElementById('khataSearch')?.value || '').toLowerCase();
   const growersList = document.getElementById('growersKhataList');
   growersList.innerHTML = '';
-  growersKhata.filter(x => x.name.toLowerCase().includes(q)).forEach(item => {
+  const matching = growersKhata.filter(x => x.name.toLowerCase().includes(q));
+  if (matching.length===0) {
+    growersList.innerHTML='<div class="empty-state"><span class="empty-state-emoji">🌾</span>No growers with pending payments.</div>';
+    return;
+  }
+  matching.forEach(item => {
     const div = document.createElement('div');
     div.className = 'khata-item';
     div.innerHTML = `
@@ -827,7 +1001,12 @@ function renderKhata() {
 
   const customersList = document.getElementById('customersKhataList');
   customersList.innerHTML = '';
-  customersKhata.filter(x => x.name.toLowerCase().includes(q)).forEach(item => {
+  const matchingCustomers = customersKhata.filter(x => x.name.toLowerCase().includes(q));
+  if (matchingCustomers.length===0) {
+    customersList.innerHTML='<div class="empty-state"><span class="empty-state-emoji">👥</span>No customers with pending payments.</div>';
+    return;
+  }
+  matchingCustomers.forEach(item => {
     const div = document.createElement('div');
     div.className = 'khata-item';
     div.innerHTML = `
@@ -928,14 +1107,6 @@ window.deleteVariety = (idx) => {
 const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
 if (prefs.darkMode === undefined && prefersDark) prefs.darkMode = true;
 
-document.getElementById('darkModeToggle').checked = prefs.darkMode || false;
-document.getElementById('darkModeToggle').addEventListener('change', (e) => {
-  prefs.darkMode = e.target.checked;
-  savePrefs();
-  document.body.classList.toggle('dark', prefs.darkMode);
-  if (profitChart || stockPieChart) renderCharts(); // Update charts on theme change
-});
-
 document.getElementById('exportDataBtn').addEventListener('click', () => {
   const data = { growers, customers, varieties, prefs };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -1005,11 +1176,8 @@ function formatDate(date) {
 }
 
 // ========== INITIALIZATION ==========
-window.addEventListener('DOMContentLoaded', () => {
-  document.body.classList.toggle('dark', prefs.darkMode);
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches && !prefs.darkMode) {
-    document.body.classList.toggle('dark', true);
-  }
+const origDOMContentLoaded = window.addEventListener;
+window.addEventListener('DOMContentLoaded', function allInitEnhancer(e) {
   renderGrowersList();
   renderCustomersList();
   renderVarietiesList();
@@ -1086,12 +1254,17 @@ window.addEventListener('DOMContentLoaded', () => {
   if (khataTools && !khataTools.querySelector('[onclick="exportKhataCSV()"]')) {
     khataTools.insertAdjacentHTML('beforeend', '<button class="btn-secondary" onclick="exportKhataCSV()">📥 Export to CSV</button>');
   }
+  setupDashboardFilters(); // Call setupDashboardFilters here
 });
 
 // Expenses renderer
 function renderExpenses() {
   const tbody = document.querySelector('#expensesTable tbody');
   tbody.innerHTML = '';
+  if(expenses.length===0){
+    tbody.innerHTML='<tr><td colspan="5"><div class="empty-state"><span class="empty-state-emoji">💸</span>No expenses yet. Add one via <b>+</b>.</div></td></tr>';
+    return;
+  }
   expenses.sort((a,b)=> new Date(b.date) - new Date(a.date)).forEach(e => {
     const tr = document.createElement('tr');
     tr.innerHTML = `<td>${e.date}</td><td>${e.desc}</td><td>${e.category}</td><td class="num">${formatCurrency(e.amount)}</td><td class="table-actions"><button class="btn-delete" onclick="deleteExpense('${e.id}')">Delete</button></td>`;
@@ -1130,18 +1303,20 @@ function renderCharts() {
   if (ctxProfit) {
     const last7Days = [];
     const profits = [];
-    for (let i = 6; i >= 0; i--) {
+    const startIdx = 6;
+    for (let i = startIdx; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
       const dayStr = formatDate(d);
       last7Days.push(d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric' }));
-      
-      const dayPurchases = growers.flatMap(g => g.transactions || []).filter(tx => tx.date === dayStr);
-      const daySales = customers.flatMap(c => c.transactions || []).filter(tx => tx.date === dayStr);
+      // Apply variety/date filters for daily chart
+      const dayFilter = tx => tx.date === dayStr && (analyticsVariety==='all'||tx.variety===analyticsVariety);
+      const dayPurchases = growers.flatMap(g => g.transactions || []).filter(dayFilter);
+      const daySales = customers.flatMap(c => c.transactions || []).filter(dayFilter);
       const dayExpenses = expenses.filter(e => e.date === dayStr);
       const profit = daySales.reduce((s, tx) => s + tx.total, 0) - 
-                    dayPurchases.reduce((s, tx) => s + tx.total, 0) - 
-                    dayExpenses.reduce((s, e) => s + e.amount, 0);
+        dayPurchases.reduce((s, tx) => s + tx.total, 0) - 
+        dayExpenses.reduce((s, e) => s + e.amount, 0);
       profits.push(profit);
     }
     
@@ -1179,12 +1354,14 @@ function renderCharts() {
     const stockMap = {};
     growers.forEach(g => {
       (g.transactions || []).forEach(tx => {
-        stockMap[tx.variety] = (stockMap[tx.variety] || 0) + (tx.boxes || 0);
+        if ((analyticsVariety==='all'||tx.variety===analyticsVariety) && (!analyticsStart||tx.date>=analyticsStart) && (!analyticsEnd||tx.date<=analyticsEnd))
+          stockMap[tx.variety] = (stockMap[tx.variety] || 0) + (tx.boxes || 0);
       });
     });
     customers.forEach(c => {
       (c.transactions || []).forEach(tx => {
-        stockMap[tx.variety] = (stockMap[tx.variety] || 0) - (tx.boxes || 0);
+        if ((analyticsVariety==='all'||tx.variety===analyticsVariety) && (!analyticsStart||tx.date>=analyticsStart) && (!analyticsEnd||tx.date<=analyticsEnd))
+          stockMap[tx.variety] = (stockMap[tx.variety] || 0) - (tx.boxes || 0);
       });
     });
     
@@ -1320,6 +1497,38 @@ function generateBill(account, type) {
   };
 }
 
+// ========== BILL PDF AND XLSX EXPORT ========== 
+document.addEventListener('DOMContentLoaded', function() {
+  // PDF export for bill preview
+  const pdfBtn = document.getElementById('exportBillPDF');
+  if (pdfBtn) pdfBtn.onclick = function() {
+    const previewDiv = document.getElementById('billPreviewContent');
+    if (!window.jspdf && !window.jsPDF) {
+      alert('PDF export requires jsPDF (add via CDN).');
+      return;
+    }
+    // Use html2canvas + jsPDF or jsPDF with html plugin
+    const doc = new (window.jspdf||window.jsPDF)();
+    doc.html(previewDiv, {
+      callback: function (pdf) { pdf.save('bill.pdf'); },
+      x: 10, y: 10, width: 180, windowWidth: previewDiv.scrollWidth
+    });
+  };
+  // Excel export for bill preview
+  const xlsxBtn = document.getElementById('exportBillXLSX');
+  if (xlsxBtn) xlsxBtn.onclick = function() {
+    if (!window.XLSX) {
+      alert('Excel export requires SheetJS (add via CDN).');
+      return;
+    }
+    // Find only the first table in preview
+    let billTable = previewDiv.querySelector('table');
+    if (!billTable) { alert('No bill table to export.'); return; }
+    let wb = window.XLSX.utils.table_to_book(billTable, { sheet:'Bill' });
+    window.XLSX.writeFile(wb, 'bill.xlsx');
+  };
+});
+
 // ========== KHATA ENHANCEMENTS ==========
 document.getElementById('markAllPaidGrowers')?.addEventListener('click', () => {
   if (!confirm('Mark ALL growers as paid? This will mark all pending purchase transactions as paid.')) return;
@@ -1444,6 +1653,244 @@ document.getElementById('fabButton').addEventListener('click', () => {
     });
   }, 100);
 });
+
+// ========== QUICK ADD BUTTON SHOW/HIDE ==========
+function updateFABs() {
+  document.getElementById('quickAddGrowerBtn').style.display = tabs.growers.section.classList.contains('active') ? '' : 'none';
+  document.getElementById('quickAddCustomerBtn').style.display = tabs.customers.section.classList.contains('active') ? '' : 'none';
+  document.getElementById('quickAddExpenseBtn').style.display = tabs.expenses.section.classList.contains('active') ? '' : 'none';
+}
+Object.values(tabs).forEach(({btn})=>btn.addEventListener('click', updateFABs));
+window.addEventListener('DOMContentLoaded', updateFABs);
+
+document.getElementById('quickAddGrowerBtn').onclick = ()=>document.getElementById('addGrowerBtn').click();
+document.getElementById('quickAddCustomerBtn').onclick = ()=>document.getElementById('addCustomerBtn').click();
+document.getElementById('quickAddExpenseBtn').onclick = ()=>document.getElementById('addExpenseBtn').click();
+
+// ========== SNACKBAR/TOAST FUNCTION ============
+function showSnackbar(msg, {action, actionLabel, actionCallback, duration=4200, type}={}) {
+  const bar = document.getElementById('snackbar');
+  bar.innerHTML = msg;
+  bar.classList.add('show');
+  if (action && actionCallback) {
+    const btn = document.createElement('span'); btn.textContent=actionLabel||'Undo'; btn.className='snackbar-action';
+    btn.onclick=()=>{ bar.classList.remove('show'); actionCallback(); };
+    bar.appendChild(btn);
+  }
+  setTimeout(()=>bar.classList.remove('show'), duration);
+}
+// Example use after delete:
+// showSnackbar('Transaction deleted',{action:true,actionLabel:'Undo',actionCallback:yourUndoFn});
+
+// ========== EMPTY STATE INSERTION (GrowersList, CustomersList, ExpensesTable, KhataTables) ===========
+function renderGrowersList() {
+  const list = document.getElementById('growersList');
+  list.innerHTML = '';
+  const q = (document.getElementById('growerSearch')?.value || '').toLowerCase();
+  const matching = growers.filter(g => g.name.toLowerCase().includes(q));
+  if (matching.length===0) {
+    list.innerHTML='<div class="empty-state"><span class="empty-state-emoji">🌾</span>No growers yet. Click <b>+</b> to add one!</div>';
+    return;
+  }
+  matching.forEach(grower => {
+    const stats = calculateGrowerStats(grower);
+    const card = document.createElement('div');
+    card.className = 'account-card';
+    card.innerHTML = `
+      <div class="account-card-header">
+        <div>
+          <div class="account-card-name">${grower.name}</div>
+          <div class="account-card-contact">${grower.contact || 'No contact'}</div>
+        </div>
+        <div class="account-card-actions">
+          <button class="icon-btn" title="Delete" onclick="deleteAccount('grower','${grower.id}')">🗑️</button>
+        </div>
+      </div>
+      <div class="account-card-stats">
+        <div class="stat-item">
+          <div class="stat-label">Total Boxes</div>
+          <div class="stat-value">${stats.totalBoxes}</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Total Amount</div>
+          <div class="stat-value">${formatCurrency(stats.totalAmount)}</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Pending</div>
+          <div class="stat-value">${formatCurrency(stats.pending)}</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Transactions</div>
+          <div class="stat-value">${(grower.transactions || []).length}</div>
+        </div>
+      </div>
+    `;
+    card.addEventListener('click', () => viewGrowerAccount(grower.id));
+    list.appendChild(card);
+  });
+
+  if (growers.length === 0) {
+    list.innerHTML = '<p style="text-align:center; color:#6b7d7d;">No growers added yet. Click "Add New Grower" to create one.</p>';
+  }
+}
+
+function renderCustomersList() {
+  const list = document.getElementById('customersList');
+  list.innerHTML = '';
+  const q = (document.getElementById('customerSearch')?.value || '').toLowerCase();
+  const matching = customers.filter(c => c.name.toLowerCase().includes(q));
+  if (matching.length===0) {
+    list.innerHTML='<div class="empty-state"><span class="empty-state-emoji">👥</span>No customers yet. Click <b>+</b> to add one!</div>';
+    return;
+  }
+  matching.forEach(customer => {
+    const stats = calculateCustomerStats(customer);
+    const card = document.createElement('div');
+    card.className = 'account-card';
+    card.innerHTML = `
+      <div class="account-card-header">
+        <div>
+          <div class="account-card-name">${customer.name}</div>
+          <div class="account-card-contact">${customer.contact || 'No contact'}</div>
+        </div>
+        <div class="account-card-actions">
+          <button class="icon-btn" title="Delete" onclick="deleteAccount('customer','${customer.id}')">🗑️</button>
+        </div>
+      </div>
+      <div class="account-card-stats">
+        <div class="stat-item">
+          <div class="stat-label">Total Boxes</div>
+          <div class="stat-value">${stats.totalBoxes}</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Total Amount</div>
+          <div class="stat-value">${formatCurrency(stats.totalAmount)}</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Pending</div>
+          <div class="stat-value">${formatCurrency(stats.pending)}</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-label">Transactions</div>
+          <div class="stat-value">${(customer.transactions || []).length}</div>
+        </div>
+      </div>
+    `;
+    card.addEventListener('click', () => viewCustomerAccount(customer.id));
+    list.appendChild(card);
+  });
+
+  if (customers.length === 0) {
+    list.innerHTML = '<p style="text-align:center; color:#6b7d7d;">No customers added yet. Click "Add New Customer" to create one.</p>';
+  }
+}
+
+function renderExpenses() {
+  const tbody=document.querySelector('#expensesTable tbody');
+  tbody.innerHTML='';
+  if(expenses.length===0){
+    tbody.innerHTML='<tr><td colspan="5"><div class="empty-state"><span class="empty-state-emoji">💸</span>No expenses yet. Add one via <b>+</b>.</div></td></tr>';
+    return;
+  }
+  expenses.sort((a,b)=> new Date(b.date) - new Date(a.date)).forEach(e => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${e.date}</td><td>${e.desc}</td><td>${e.category}</td><td class="num">${formatCurrency(e.amount)}</td><td class="table-actions"><button class="btn-delete" onclick="deleteExpense('${e.id}')">Delete</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderKhata() {
+  const growersKhata = [];
+  const customersKhata = [];
+
+  growers.forEach(g => {
+    const pending = (g.transactions || []).filter(tx => tx.paymentStatus === 'due')
+      .reduce((sum, tx) => sum + tx.total, 0);
+    if (pending > 0) {
+      growersKhata.push({ name: g.name, amount: pending, id: g.id });
+    }
+  });
+
+  customers.forEach(c => {
+    const pending = (c.transactions || []).filter(tx => tx.paymentStatus === 'pending')
+      .reduce((sum, tx) => sum + tx.total, 0);
+    if (pending > 0) {
+      customersKhata.push({ name: c.name, amount: pending, id: c.id });
+    }
+  });
+
+  const q = (document.getElementById('khataSearch')?.value || '').toLowerCase();
+  const growersList = document.getElementById('growersKhataList');
+  growersList.innerHTML = '';
+  const matchingGrowers = growersKhata.filter(x => x.name.toLowerCase().includes(q));
+  if (matchingGrowers.length===0) {
+    growersList.innerHTML='<div class="empty-state"><span class="empty-state-emoji">🌾</span>No growers with pending payments.</div>';
+    return;
+  }
+  matchingGrowers.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'khata-item';
+    div.innerHTML = `
+      <div class="khata-item-info">
+        <div class="khata-item-name">${item.name}</div>
+        <div class="khata-item-amount">${formatCurrency(item.amount)}</div>
+      </div>
+      <div class="khata-item-actions">
+        <button class="btn-secondary" onclick="markGrowerPaid('${item.id}')">Mark Paid</button>
+      </div>
+    `;
+    growersList.appendChild(div);
+  });
+
+  const customersList = document.getElementById('customersKhataList');
+  customersList.innerHTML = '';
+  const matchingCustomers = customersKhata.filter(x => x.name.toLowerCase().includes(q));
+  if (matchingCustomers.length===0) {
+    customersList.innerHTML='<div class="empty-state"><span class="empty-state-emoji">👥</span>No customers with pending payments.</div>';
+    return;
+  }
+  matchingCustomers.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'khata-item';
+    div.innerHTML = `
+      <div class="khata-item-info">
+        <div class="khata-item-name">${item.name}</div>
+        <div class="khata-item-amount">${formatCurrency(item.amount)}</div>
+      </div>
+      <div class="khata-item-actions">
+        <button class="btn-secondary" onclick="markCustomerReceived('${item.id}')">Mark Received</button>
+      </div>
+    `;
+    customersList.appendChild(div);
+  });
+  const dueGrowers = growersKhata.reduce((s,x)=>s+x.amount,0);
+  const dueCustomers = customersKhata.reduce((s,x)=>s+x.amount,0);
+  const summary = document.getElementById('khataSummary');
+  summary.textContent = `Total Due to Growers: ${formatCurrency(dueGrowers)} | Pending from Customers: ${formatCurrency(dueCustomers)} | Net Balance: ${formatCurrency(dueCustomers - dueGrowers)}`;
+}
+
+// ========== MINI-TOOLTIP HOVER LOGIC ==========
+document.querySelectorAll('[data-tooltip]').forEach(el=>{
+  el.addEventListener('mouseenter',e=>{
+    const tipId=el.getAttribute('data-tooltip'); const tt=document.getElementById(tipId);
+    if(tt){const rect=el.getBoundingClientRect();tt.style.top=(rect.bottom+8)+'px';tt.style.left=(rect.left+8)+'px';tt.classList.add('show');}
+  });
+  el.addEventListener('mouseleave',e=>{
+    const tipId=el.getAttribute('data-tooltip');const tt=document.getElementById(tipId);if(tt){tt.classList.remove('show');}
+  });
+});
+
+// ========== AUTO-FOCUS FIRST INPUT ON MODAL OPEN ========== 
+function autoFocusModal(modalSel) {
+  const m=document.querySelector(modalSel);if(!m)return;
+  m.addEventListener('transitionend', () => {
+    const inp = m.querySelector('input,textarea,select');
+    if(inp) inp.focus();
+  });
+}
+autoFocusModal('#addAccountModal');
+autoFocusModal('#billPreviewModal');
+autoFocusModal('#expenseForm');
 
 // ========== INLINE EDITING (for rates in transaction tables) ==========
 // Add double-click to edit functionality in transaction tables
