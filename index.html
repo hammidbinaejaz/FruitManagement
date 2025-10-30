@@ -14,6 +14,10 @@
   <!-- Chart.js is used by your script.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
 
+  <!-- jsPDF and SheetJS for exports -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+
   <!-- Accessibility: skip to main content -->
   <style>
     .skip-link {
@@ -181,6 +185,20 @@
 <body>
   <a href="#main" class="skip-link">Skip to content</a>
 
+  <div id="onboardingModal" class="modal hidden" aria-hidden="true">
+    <div class="modal-content" style="max-width:520px;">
+      <span class="modal-close" role="button" aria-label="Close onboarding">&times;</span>
+      <h3>Welcome to Digital Khata!</h3>
+      <ol style="margin-bottom:1.5rem;color:#475569;line-height:1.7;font-size:1rem;">
+        <li>Save Growers and Customers to start recording transactions.</li>
+        <li>Use <span data-tip="A small fee paid by sellers to Mandi commission agents." class="info-tooltip" style="border-bottom:1px dotted #0d9488;">Commission</span>, <span data-tip="Transport cost for shifting produce from mandi to the buyer/customer." class="info-tooltip" style="border-bottom:1px dotted #0d9488;">Transport</span>, and Rate fields for each box.</li>
+        <li>Export and print bills/invoices from the Accounts and Dashboard tabs.</li>
+        <li>Work offline seamlessly; your data is stored securely on your device.</li>
+      </ol>
+      <button id="onboardingDismiss" class="btn-primary" style="width:100%">Got it!</button>
+    </div>
+  </div>
+
   <header>
     <div class="header-content" style="display:flex; align-items:center; justify-content:space-between; gap:1rem;">
       <div style="display:flex; align-items:center; gap:1rem;">
@@ -190,15 +208,8 @@
           <div class="subtitle">Professional Fruit Trading Management System</div>
         </div>
       </div>
-
       <div style="display:flex; align-items:center; gap:0.75rem;">
-        <!-- quick status (non-functional, purely UI) -->
-        <div aria-hidden="true" style="font-size:0.9rem; color:rgba(255,255,255,0.95); font-weight:600;">Offline • Secure</div>
-        <!-- preferences shortcut (JS uses the checkbox with id `darkModeToggle`) -->
-        <label style="display:flex; align-items:center; gap:0.5rem; background:rgba(255,255,255,0.12); padding:0.45rem 0.6rem;border-radius:999px;">
-          <input id="darkModeToggle" type="checkbox" style="width:18px;height:18px;" aria-label="Toggle dark mode">
-          <span style="color:white; font-weight:700; font-size:0.85rem;">Dark</span>
-        </label>
+        <div aria-hidden="true" id="offlineStatus" class="offline-badge" style="font-size:0.9rem; color:#ffd700; font-weight:600; display:none">You are offline</div>
       </div>
     </div>
 
@@ -228,6 +239,15 @@
             <option value="month">This Month</option>
             <option value="all" selected>All Time</option>
           </select>
+        </div>
+      </div>
+
+      <div class="dashboard-profile-card" style="display:flex;align-items:center;gap:1rem;margin-bottom:1.3rem;max-width:500px;">
+        <div class="profile-avatar" style="width:52px;height:52px;border-radius:50%;background:#eef2fa;color:#0a5a45;display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:700;">👤</div>
+        <div style="display:flex;flex-direction:column;gap:2px;">
+          <div style="font-weight:700;font-size:1.15rem;" id="dashboardProfileName">User/Firm Name</div>
+          <div style="font-size:.98em;color:#15803d;" id="dashboardProfileMandi">Mandi</div>
+          <div style="font-size:.94em;color:#64748b;" id="dashboardProfilePhone">+91 Phone</div>
         </div>
       </div>
 
@@ -270,6 +290,19 @@
       <!-- Charts -->
       <div class="dashboard-section">
         <h3>📊 Analytics & Trends</h3>
+        <!-- Filter Controls -->
+        <div class="dashboard-filters" style="display:flex;flex-wrap:wrap;gap:.75rem 1.2rem;align-items:center;margin-bottom:1.6rem;">
+          <label for="analyticsVariety" style="font-weight:600">Variety:</label>
+          <select id="analyticsVariety" style="min-width:140px;"><option value="all">All</option></select>
+          <label for="analyticsCustomStart" style="font-weight:600">Start:</label>
+          <input type="date" id="analyticsCustomStart" style="min-width:120px;">
+          <label for="analyticsCustomEnd" style="font-weight:600">End:</label>
+          <input type="date" id="analyticsCustomEnd" style="min-width:120px;">
+          <button class="btn-secondary" id="applyAnalyticsFilter" style="margin-left:6px;">Apply</button>
+          <button class="btn-secondary" id="resetAnalyticsFilter">Reset</button>
+          <button class="btn-primary" id="exportDashboardPDF" style="margin-left:auto">Export PDF</button>
+          <button class="btn-primary" id="exportDashboardXLSX">Export Excel</button>
+        </div>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem;">
           <div class="chart-container">
             <h4 style="margin-bottom:1rem; color:var(--brand-1); font-weight:700">7-Day Profit Trend</h4>
@@ -335,6 +368,7 @@
             <input type="date" id="growerTxDate" required>
             <select id="growerTxVariety" required><option value="">Select Variety</option></select>
             <input type="number" id="growerTxBoxes" placeholder="No. of Boxes" min="1" required>
+            <select id="growerTxBoxType" required data-tooltip="tooltip-box-type"><option value="">Box Type</option><option value="Big">Big</option><option value="Small">Small</option></select>
             <input type="number" id="growerTxRate" placeholder="Rate per Box (₹)" min="0" step="0.01" required>
             <input type="number" id="growerTxCommission" placeholder="Commission (₹)" min="0" step="0.01">
             <input type="number" id="growerTxTransport" placeholder="Transport (₹)" min="0" step="0.01">
@@ -350,7 +384,7 @@
         <div class="transactions-container">
           <h3>Transaction History</h3>
           <table id="growerTransactionsTable" class="transactions-table">
-            <thead><tr><th>Date</th><th>Variety</th><th>Boxes</th><th>Rate</th><th>Commission</th><th>Transport</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Date</th><th>Variety</th><th>Boxes</th><th>Box Type</th><th>Rate</th><th>Commission</th><th>Transport</th><th>Total</th><th>Status</th><th>Notes</th><th>Actions</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -389,6 +423,7 @@
             <input type="date" id="customerTxDate" required>
             <select id="customerTxVariety" required><option value="">Select Variety</option></select>
             <input type="number" id="customerTxBoxes" placeholder="No. of Boxes" min="1" required>
+            <select id="customerTxBoxType"><option value="">Box Type</option><option value="Big">Big</option><option value="Small">Small</option></select>
             <input type="number" id="customerTxRate" placeholder="Rate per Box (₹)" min="0" step="0.01" required>
             <input type="number" id="customerTxCommission" placeholder="Commission (₹)" min="0" step="0.01">
             <input type="number" id="customerTxTransport" placeholder="Transport (₹)" min="0" step="0.01">
@@ -404,7 +439,7 @@
         <div class="transactions-container">
           <h3>Transaction History</h3>
           <table id="customerTransactionsTable" class="transactions-table">
-            <thead><tr><th>Date</th><th>Variety</th><th>Boxes</th><th>Rate</th><th>Commission</th><th>Transport</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Date</th><th>Variety</th><th>Boxes</th><th>Box Type</th><th>Rate</th><th>Commission</th><th>Transport</th><th>Total</th><th>Status</th><th>Notes</th><th>Actions</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
@@ -542,13 +577,31 @@
       <span class="modal-close" id="closeBillPreview" role="button" aria-label="Close bill preview">&times;</span>
       <h3>📄 Bill Preview</h3>
       <div id="billPreviewContent" style="max-height: 70vh; overflow-y: auto; margin-top: 1rem;"></div>
-      <div class="form-actions" style="margin-top: 1rem;">
+      <div class="form-actions" style="margin-top: 1rem; gap:.8em; flex-wrap:wrap;">
         <button class="btn-primary" id="printBillBtn">🖨️ Print Bill</button>
         <button class="btn-secondary" id="markPrintedBtn">✓ Mark as Printed</button>
         <button class="btn-secondary modal-close-btn">Close</button>
+        <button class="btn-primary" id="exportBillPDF" style="margin-left:0.5em;">Export PDF</button>
+        <button class="btn-primary" id="exportBillXLSX">Export Excel</button>
+      </div>
+      <!-- Bill export area for reporting and batch in future -->
+      <div id="billExportTools" style="margin-top:1.3em; display:flex; gap:1em; flex-wrap:wrap; align-items:center;">
+        <button class="btn-secondary" id="batchPrintBills" style="display:none">Batch Print All Pending</button>
+        <button class="btn-secondary" id="downloadBillsCSV" style="display:none">Export All To CSV</button>
       </div>
     </div>
   </div>
+
+  <!-- Floating Quick Add Buttons (shown as needed) -->
+  <div id="quickAddGrowerBtn" class="fab fab-grower" title="Add Grower" style="display:none;">+</div>
+  <div id="quickAddCustomerBtn" class="fab fab-customer" title="Add Customer" style="display:none;">+</div>
+  <div id="quickAddExpenseBtn" class="fab fab-expense" title="Add Expense" style="display:none;">+</div>
+  <!-- Snackbar/Toast for Undo/Success -->
+  <div id="snackbar" class="snackbar"></div>
+  <!-- Example tooltip markup (more can be added for each field/button) -->
+  <span class="mini-tooltip" id="tooltip-commission" style="display:none;">Commission is a fee paid to agents.</span>
+  <span class="mini-tooltip" id="tooltip-rate" style="display:none;">Rate per box you agreed with grower/customer.</span>
+  <span class="mini-tooltip" id="tooltip-box-type" style="display:none;">Box Type indicates the size of the box (e.g., Big, Small).</span>
 
   <!-- keep your script file unchanged (contains all features/logic) -->
   <script src="script.js" defer></script>
